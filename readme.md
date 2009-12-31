@@ -4,7 +4,7 @@
 
 ### Install & Setup
 
-  * Download zip from <hoge>
+  * Download latest .zip from <http://github.com/snaka/Notify-io-client-4R/downloads>
   * Unzip .zip file
   * Run notify-io-client.exe
   * Register your google account name (email) if input dialog appeared.
