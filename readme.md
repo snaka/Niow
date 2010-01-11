@@ -12,6 +12,13 @@
 
 That&apos;s all.
 
+### How to make executable
+
+<code>
+  cd bin
+  exerb -c gui notify-io-client.exy
+</code>
+
 ## Gem
 
 (ToDo)
