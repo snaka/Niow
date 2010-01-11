@@ -31,7 +31,6 @@ THE SOFTWARE.
 # }}}
 
 
-require 'digest/md5'
 require 'net/http'
 
 require 'rubygems'
@@ -49,42 +48,6 @@ end
 
 class NotifyIO
 
-  def account=(acc)
-    @account = acc
-  end
-  
-  def account(&block)
-    if block_given?
-      return @account = block
-    end
-    return @account.call 
-  end
-
-  def api_key=(key)
-    @api_key = key
-  end
-
-  def api_key(&proc)
-    if proc
-      @api_key = proc
-    else
-      if @api_key.respond_to?(:call)
-        return @api_key.call(account)
-      end
-      return @api_key
-    end
-  end
-
-  def user_hash
-    acc = nil
-    if @account.respond_to?(:call)
-      acc = @account.call
-    else
-      acc = @account
-    end
-    Digest::MD5.hexdigest(acc) || ''
-  end
-
   def get_proxy
     (ENV["http_proxy"] || "").sub(/http:\/\//, "").split(/[:\/]/)
   end
@@ -92,34 +55,45 @@ class NotifyIO
   #
   # Start main loop
   #
-  def start
+  def start(target_urls)
 
-    url = "/v1/listen/#{user_hash}?api_key=#{api_key}"
+    if !target_urls or target_urls.size == 0
+      raise "target_url is nil or empty"
+    end
+    
+    p target_urls if $DEBUG
 
-    proxy_host, proxy_port = get_proxy
-    puts "proxy host: #{proxy_host} / port: #{proxy_port}" if $DEBUG
+    target_urls.each do |target|
+      puts "*** target: #{target}" if $DEBUG
 
-    # Main loop
-    while true
-      begin
-        puts "Waiting for response..."  if $DEBUG
-        Net::HTTP::Proxy(proxy_host, proxy_port).start('api.notify.io') {|http|
-          http.read_timeout = 60 * 30 
-          puts "timeout after #{http.read_timeout} sec."  if $DEBUG
-          http.get(url) {|str|
-            p str   if $DEBUG
-            begin
-              notify = JSON.parse(str)
-              notify.extend(NotifyDumper)
-              yield notify
-            rescue
-              puts "Parsing failed"  if $DEBUG
-            end
-          }
-        }
-      rescue Timeout::Error => ex
-        # do nothing
-        puts "Timeout and retry ..."  if $DEBUG
+      Thread.new(URI.parse(target)) do |uri|
+        proxy_host, proxy_port = get_proxy
+        puts "proxy host: #{proxy_host} / port: #{proxy_port}" if $DEBUG
+
+        # Main loop
+        while true
+          begin
+            puts "Waiting for response #{target} ..."  if $DEBUG
+            Net::HTTP::Proxy(proxy_host, proxy_port).start(uri.host) {|http|
+              http.read_timeout = 60 * 15 
+              puts "timeout after #{http.read_timeout} sec."  if $DEBUG
+
+              http.get(uri.path) {|str|
+                p str   if $DEBUG
+                begin
+                  notify = JSON.parse(str)
+                  notify.extend(NotifyDumper)
+                  yield notify
+                rescue
+                  puts "Parsing failed"  if $DEBUG
+                end
+              }
+            }
+          rescue Timeout::Error => ex
+            # do nothing
+            puts "Timeout and retry ..."  if $DEBUG
+          end
+        end
       end
     end
   end
@@ -143,3 +117,4 @@ if __FILE__ == $0
 
 end
 
+# vim: sw=2 ts=2 et fdm=marker

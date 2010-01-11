@@ -30,9 +30,9 @@ THE SOFTWARE.
 =end
 # }}}
 
-require 'yaml/store'
 require 'kconv'
 require 'Win32API'
+require 'Win32/registry'
 
 require 'vr/vruby'
 require 'vr/vrlayout'
@@ -44,11 +44,14 @@ require 'rubygems'
 require 'ruby_gntp'
 
 require 'notify-io'
-require 'notify-io/util'
+
+$notify_io = 'http://www.notify.io'
 
 $exepath = File.dirname(File.expand_path(__FILE__))
+$exename = $Exerb ? ExerbRuntime.filename() : __FILE__
 
-ExtractIcon = Win32API.new("shell32", "ExtractIcon", "LPI", "L")
+ShellExecute = Win32API.new("shell32", "ShellExecute", "LPPPPI", "L")
+ExtractIcon  = Win32API.new("shell32", "ExtractIcon", "LPI", "L")
 $mini_icon = ExtractIcon.call(0, "#{$exepath}/notify.ico", 0)
 
 Signal.trap(:INT) {
@@ -74,47 +77,34 @@ class LogArea < VRText
       
 end
 
-
-# input dialog
-module InputDialog
-
-  def construct
-    move 200, 200, 315, 115 
-    self.caption = "Please input.. "
-    addControl(VRStatic, "label", label_text, 5, 5, 300, 25)
-    addControl(VREdit, "input_edit", "", 5, 25, 300, 25)
-    addControl(VRButton, "close_button", "OK", 100, 50, 100, 25)
-  end
-
-  def close_button_clicked
-    close(@input_edit.text)
-  end
-
-  def caption_text
-    ""  # override in subclass
-  end
-
-end
-
-# account input dialog
-module AccountInputDialog
-  include InputDialog
-  def label_text; "Please input your google account(email)"; end
-end
-
-# password input dialog
-module PasswordInputDialog
-  include InputDialog
-  def label_text; "Plese input your password for google account"; end
-end
-
-
 # main form
 class NotifyClient < VRForm
 
   include VRMenuUseable
   include VRTrayiconFeasible
   include VRGridLayoutManager
+
+  def initialize
+    # register application
+    Win32::Registry::HKEY_CURRENT_USER.create('Software\Classes\.ListenURL') do |reg|
+      if reg.created?
+        reg.write_s nil, "Notify_io"
+      end
+    end
+    Win32::Registry::HKEY_CURRENT_USER.create('Software\Classes\Notify_io') do |reg|
+      if reg.created?
+        reg.write_s nil, "Notify.io client"
+        reg.create('shell\register\command') do |command|
+          command.write_s nil, "\"#{to_win_path($exepath)}\\#{$exename}\" \"%1\""
+        end
+        messageBox "The application registration succeeded."
+      end
+    end
+  end
+
+  def to_win_path(path)
+    path.split('/').join(File::ALT_SEPARATOR)
+  end
 
   def construct
 
@@ -124,7 +114,7 @@ class NotifyClient < VRForm
     addControl(VRButton, "close_button", "Minimize in tasktray", 0, 9, 10, 1)
     @log_area.readonly = true
 
-    # register growl
+    # register to growl
     @growl = GNTP.new("Notify.io")
     @growl.register(
       :app_icon => "file://#{$exepath}/notify-io.png",
@@ -138,12 +128,16 @@ class NotifyClient < VRForm
       :icon     => "file://#{$exepath}/notify-io.png" 
     )
 
-    # tray menu
+    # set tray menu
     @traymenu = newPopupMenu
     @traymenu.set([
       ["Open window", "restore"],
+      ["History", "open_history"],
+      ["Settings", "open_settings"],
       ["Exit", "exit"]
     ])
+
+    store_config if ARGV[0]
 
     polling
 
@@ -151,10 +145,63 @@ class NotifyClient < VRForm
 
     # to system tray after n sec.
     Thread.new(@log_area) do |log|
-      log.put_msg("Going to tasktray after 5 seconds.")
+      log.put_msg("This window is stored in the task tray, 5 seconds after.")
       sleep 5
       close_button_clicked
     end
+  end
+
+  # --- other methods
+
+  $config_file = File.expand_path("~/.Niow")
+
+  # store configuration info
+  def store_config
+    File.open($config_file, "w") do |file|
+      ARGF.each do |line|
+        file.puts line
+      end 
+    end
+  end
+
+
+  # waiting for api response
+  def polling
+
+    notify_io = NotifyIO.new
+    target_urls = []
+
+    # get targets
+    unless File.exist?($config_file)
+      messageBox "ListenURL file has not installed.\nPlease download and install ListenURL file from your Notify.io 'Outlet' page."
+      ShellExecute.call(self.hWnd, "open", "#{$notify_io}/outlets", 0, 0, 1)
+      exit -1
+    end
+
+    begin
+      target_urls = File.open($config_file, "r").readlines
+    rescue
+      messageBox "Can't open #{$config_file}"
+      exit -1
+    end
+
+    notify_io.start(target_urls) do |notify|
+      @log_area.put_msg(notify.to_s)
+      @growl.notify(
+        :name   => "notify", 
+        :title  => notify["title"], 
+        :text   => notify["text"],
+        :icon   => notify["icon"]
+      )
+    end
+
+  end
+
+  def set_form_icon
+    SMSG::sendMessage( self.hWnd, 
+                       0x80,         # WM_SETICON 
+                       0,            # 0: ICON_SMALL / 1: ICON_BIG
+                       $mini_icon ) 
   end
 
   # --- event handlers 
@@ -174,77 +221,23 @@ class NotifyClient < VRForm
     delete_trayicon
   end
 
+  def open_history_clicked
+    ShellExecute.call(self.hWnd, "open", "#{$notify_io}/history", 0, 0, 1)
+    @log_area.put_msg("Open history page...")
+  end
+
+  def open_settings_clicked
+    ShellExecute.call(self.hWnd, "open", "#{$notify_io}/settings", 0, 0, 1)
+    @log_area.put_msg("Open settings page...")
+  end
+
   def exit_clicked
     delete_trayicon
     self.close
-  end
-
-  # --- other methods
-
-  # waiting for api response
-  def polling
-    Thread.new(@growl, @log_area) do |g, log|
-
-      storage = YAML::Store.new("#{$exepath}/key.yaml")
-      notify_io = NotifyIO.new
-
-      notify_io.account do
-        account = nil
-        storage.transaction do
-          unless storage[:account]
-            user_input = VRLocalScreen.modalform(nil, nil, AccountInputDialog)
-            abort unless user_input
-
-            storage[:account] = user_input
-          end
-          account = storage[:account]
-        end
-
-        account
-      end
-
-      notify_io.api_key do |account|
-        api_key = nil
-        storage.transaction do
-          unless storage[:api_key]
-            passwd = VRLocalScreen.modalform(nil, nil, PasswordInputDialog)
-            abort unless passwd
-
-            begin
-              storage[:api_key] = get_apikey(account, passwd)
-            rescue
-              abort
-            end
-          end
-          api_key = storage[:api_key]
-        end
-
-        log.put_line "account : #{account}"
-        log.put_line "api_key : #{'*' * api_key.size}"
-
-        api_key
-      end
-
-      notify_io.start do |notify|
-        log.put_msg(notify.to_s)
-        g.notify(
-          :name   => "notify", 
-          :title  => notify["title"], 
-          :text   => notify["text"],
-          :icon   => notify["icon"]
-        )
-      end
-    end
-  end
-
-  def set_form_icon
-    SMSG::sendMessage( self.hWnd, 
-                       0x80,         # WM_SETICON 
-                       0,            # 0: ICON_SMALL / 1: ICON_BIG
-                       $mini_icon ) 
   end
 
 end
 
 VRLocalScreen.start(NotifyClient, 150, 150, 600, 400)
 
+# vim: ts=2 sw=2 et fdm=marker
