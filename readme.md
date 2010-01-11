@@ -14,10 +14,10 @@ That&apos;s all.
 
 ### How to make executable
 
-<code>
+<code><pre>
   cd bin
   exerb -c gui notify-io-client.exy
-</code>
+</pre></code>
 
 ## Gem
 
