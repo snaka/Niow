@@ -15,8 +15,8 @@ That&apos;s all.
 ### How to make executable
 
 <code><pre>
-  cd bin
-  exerb -c gui notify-io-client.exy
+cd bin
+exerb -c gui notify-io-client.exy
 </pre></code>
 
 ## Gem

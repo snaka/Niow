@@ -47,8 +47,17 @@ require 'notify-io'
 
 $notify_io = 'http://www.notify.io'
 
-$exepath = File.dirname(File.expand_path(__FILE__))
+def to_std(path)
+  path.split(File::ALT_SEPARATOR).join(File::SEPARATOR)
+end
+
+$exepath =  if $Exerb then
+              File.dirname(to_std(ExerbRuntime.filepath())) 
+            else
+              File.dirname(File.expand_path(__FILE__))
+            end
 $exename = $Exerb ? ExerbRuntime.filename() : __FILE__
+
 
 ShellExecute = Win32API.new("shell32", "ShellExecute", "LPPPPI", "L")
 ExtractIcon  = Win32API.new("shell32", "ExtractIcon", "LPI", "L")
@@ -91,15 +100,33 @@ class NotifyClient < VRForm
         reg.write_s nil, "Notify_io"
       end
     end
+
     Win32::Registry::HKEY_CURRENT_USER.create('Software\Classes\Notify_io') do |reg|
       if reg.created?
         reg.write_s nil, "Notify.io client"
         reg.create('shell\register\command') do |command|
           command.write_s nil, "\"#{to_win_path($exepath)}\\#{$exename}\" \"%1\""
         end
-        messageBox "The application registration succeeded."
+        messageBox "The application installation succeeded."
       end
     end
+
+    # register to growl
+    @growl = GNTP.new("Notify.io")
+    @growl.register(
+      :app_icon => "file://#{$exepath}/notify-io.png",
+      :notifications => [ :name => "notify", :enabled => true ]
+    )
+
+    store_config if ARGV[0]
+
+    # get targets
+    unless File.exist?($config_file)
+      messageBox "ListenURL file has not installed.\nPlease download and install ListenURL file from your Notify.io 'Outlet' page."
+      ShellExecute.call(self.hWnd, "open", "#{$notify_io}/outlets", 0, 0, 1)
+      exit -1
+    end
+
   end
 
   def to_win_path(path)
@@ -114,20 +141,6 @@ class NotifyClient < VRForm
     addControl(VRButton, "close_button", "Minimize in tasktray", 0, 9, 10, 1)
     @log_area.readonly = true
 
-    # register to growl
-    @growl = GNTP.new("Notify.io")
-    @growl.register(
-      :app_icon => "file://#{$exepath}/notify-io.png",
-      :notifications => [ :name => "notify", :enabled => true ]
-    )
-
-    @growl.notify(
-      :name     => "notify",
-      :title    => "Notify.io client for Windows",
-      :text     => "Now starting...",
-      :icon     => "file://#{$exepath}/notify-io.png" 
-    )
-
     # set tray menu
     @traymenu = newPopupMenu
     @traymenu.set([
@@ -136,8 +149,6 @@ class NotifyClient < VRForm
       ["Settings", "open_settings"],
       ["Exit", "exit"]
     ])
-
-    store_config if ARGV[0]
 
     polling
 
@@ -149,6 +160,8 @@ class NotifyClient < VRForm
       sleep 5
       close_button_clicked
     end
+
+    notify "Now starting..."
   end
 
   # --- other methods
@@ -162,21 +175,24 @@ class NotifyClient < VRForm
         file.puts line
       end 
     end
+    notify "ListenURL file has installed successfully."
   end
 
+  # notify
+  def notify(msg)
+    @growl.notify(
+      :name     => "notify",
+      :title    => "Notify.io client for Windows",
+      :text     => msg,
+      :icon     => "file://#{$exepath}/notify-io.png" 
+    )
+  end
 
   # waiting for api response
   def polling
 
     notify_io = NotifyIO.new
     target_urls = []
-
-    # get targets
-    unless File.exist?($config_file)
-      messageBox "ListenURL file has not installed.\nPlease download and install ListenURL file from your Notify.io 'Outlet' page."
-      ShellExecute.call(self.hWnd, "open", "#{$notify_io}/outlets", 0, 0, 1)
-      exit -1
-    end
 
     begin
       target_urls = File.open($config_file, "r").readlines
