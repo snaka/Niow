@@ -1,0 +1,8 @@
+#
+# ChangeLog for Niow
+#
+
+2010-01-29  snaka <snaka.gml@gmail.com>
+  * lib/notify-io.rb : Extract proxy authenticate information from environment variable 'http_proxy'.
+  * test : Add test file.
+

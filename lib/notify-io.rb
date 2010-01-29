@@ -49,7 +49,7 @@ end
 class NotifyIO
 
   def get_proxy
-    (ENV["http_proxy"] || "").sub(/http:\/\//, "").split(/[:\/]/)
+    URI.parse(ENV['http_proxy'] || '')
   end
 
   #
@@ -67,14 +67,14 @@ class NotifyIO
       puts "*** target: #{target}" if $DEBUG
 
       Thread.new(URI.parse(target)) do |uri|
-        proxy_host, proxy_port = get_proxy
-        puts "proxy host: #{proxy_host} / port: #{proxy_port}" if $DEBUG
+        proxy = get_proxy
+        puts "proxy host: #{proxy.host} / port: #{proxy.port} / user: #{proxy.user} / pass: #{proxy.password}" if $DEBUG
 
         # Main loop
         while true
           begin
             puts "Waiting for response #{target} ..."  if $DEBUG
-            Net::HTTP::Proxy(proxy_host, proxy_port).start(uri.host) {|http|
+            Net::HTTP::Proxy(proxy.host, proxy.port, proxy.user, proxy.password).start(uri.host) {|http|
               http.read_timeout = 60 * 15 
               puts "timeout after #{http.read_timeout} sec."  if $DEBUG
 
@@ -93,9 +93,11 @@ class NotifyIO
             # do nothing
             puts "Timeout and retry ..."  if $DEBUG
           end
-        end
-      end
-    end
+        end # Main loop
+
+      end # Thread
+
+    end # target_urls
   end
 end
  
