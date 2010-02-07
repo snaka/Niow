@@ -2,7 +2,7 @@
 # ChangeLog for Niow
 #
 
-2010-02-07  snaka <snaka.gml@gmail.com>
+2010-02-07  snaka <snaka.gml@gmail.com> version 0.1.5
   * bin/notify-io-client.rb : Change close button and tray icon behavior.
   * lib/vrextend/tray.rb : Add task-tray event dispatcher.
 
