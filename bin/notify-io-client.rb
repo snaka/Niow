@@ -36,6 +36,7 @@ require 'Win32/registry'
 
 require 'vr/vruby'
 require 'vr/vrlayout'
+require 'vr/vrhandler'
 require 'vr/vrcontrol'
 require 'vr/vrtray'
 require 'vr/vrdialog'
@@ -44,6 +45,7 @@ require 'rubygems'
 require 'ruby_gntp'
 
 require 'notify-io'
+require 'vrextend/tray'
 
 $notify_io = 'http://www.notify.io'
 
@@ -89,6 +91,7 @@ end
 # main form
 class NotifyClient < VRForm
 
+  include VRClosingSensitive
   include VRMenuUseable
   include VRTrayiconFeasible
   include VRGridLayoutManager
@@ -156,9 +159,10 @@ class NotifyClient < VRForm
 
     # to system tray after n sec.
     Thread.new(@log_area) do |log|
-      log.put_msg("This window is stored in the task tray, 5 seconds after.")
-      sleep 5
-      close_button_clicked
+      wait = 3
+      log.put_msg("This window is stored in the task tray, #{wait} seconds after.")
+      sleep wait 
+      minimize_window
     end
 
     notify "Now starting..."
@@ -184,7 +188,7 @@ class NotifyClient < VRForm
       :name     => "notify",
       :title    => "Notify.io client for Windows",
       :text     => msg,
-      :icon     => "file://#{$exepath}/notify-io.png" 
+      :icon     => "file:///#{$exepath}/notify-io.png" 
     )
   end
 
@@ -220,21 +224,40 @@ class NotifyClient < VRForm
                        $mini_icon ) 
   end
 
-  # --- event handlers 
-
-  def close_button_clicked
+  def minimize_window
     self.hide
     create_trayicon($mini_icon)
+  end
+
+  def restore_window
+    self.show
+  end
+
+  # --- form event handlers 
+
+  def self_close
+    minimize_window
+    SKIP_DEFAULTHANDLER
+  end
+
+  def close_button_clicked
+    minimize_window
+  end
+
+  # --- tray event handlers
+
+  def self_traylbuttondblclk(iconid)
+    restore_window
   end
 
   def self_trayrbuttonup(iconid)
     showPopup @traymenu
   end
 
-  # menu handlers
+  # --- menu handlers
+
   def restore_clicked
-    self.show
-    delete_trayicon
+    restore_window
   end
 
   def open_history_clicked

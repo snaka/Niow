@@ -47,10 +47,14 @@ file:
     file: C:/PROGRA~1/ruby-1.8/lib/ruby/vendor_ruby/1.8/vr/vrcontrol.rb
   vr/contrib/vrtrayballoon.rb:
     file: C:/PROGRA~1/ruby-1.8/lib/ruby/vendor_ruby/1.8/vr/contrib/vrtrayballoon.rb
+  vr/contrib/vrctlcolor.rb:
+    file: C:/PROGRA~1/ruby-1.8/lib/ruby/vendor_ruby/1.8/vr/contrib/vrctlcolor.rb
   vr/vrtray.rb:
     file: C:/PROGRA~1/ruby-1.8/lib/ruby/vendor_ruby/1.8/vr/vrtray.rb
   vr/vrdialog.rb:
     file: C:/PROGRA~1/ruby-1.8/lib/ruby/vendor_ruby/1.8/vr/vrdialog.rb
+  vr/vrhandler.rb:
+    file: C:/PROGRA~1/ruby-1.8/lib/ruby/vendor_ruby/1.8/vr/vrhandler.rb
   rubygems/defaults.rb:
     file: C:/PROGRA~1/ruby-1.8/lib/ruby/site_ruby/1.8/rubygems/defaults.rb
   thread.so:
@@ -196,5 +200,7 @@ file:
     file: C:/PROGRA~1/ruby-1.8/lib/ruby/gems/1.8/gems/json-1.2.0-x86-mswin32/lib/json/pure/generator.rb
   json/pure.rb:
     file: C:/PROGRA~1/ruby-1.8/lib/ruby/gems/1.8/gems/json-1.2.0-x86-mswin32/lib/json/pure.rb
+  vrextend/tray.rb:
+    file: ../lib/vrextend/tray.rb
   notify-io.rb:
     file: ../lib/notify-io.rb
